@@ -1,0 +1,518 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#17734a"><link rel="manifest" href="manifest.webmanifest"><link rel="icon" href="icon-192.png"><style>:root{color-scheme:light}body{margin:0;font-size:14px}</style></head><body><title>Pen Walker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: full-height field tool. Status strip on top, map fills the middle, tabbed control sheet pinned to the bottom. */
+:root{
+  --bg:#f2f4f1; --surface:#ffffff; --ink:#15211b; --muted:#5b6a61; --line:#d3dad4;
+  --accent:#17734a; --accent-ink:#ffffff; --bunk:#d48a00; --alley:#2c6bb8; --bad:#b83227;
+  --map:#e9eee9; --grid:#d2dad3; --halo:#f2f4f1;
+  --r1:#2f8f5b; --r2:#3a74c2; --r3:#a55fb8; --r4:#c47a1c; --r5:#1d9aa6; --r6:#b8506a;
+  --f-display:"Barlow Condensed","Arial Narrow",sans-serif; --f-body:"Barlow",system-ui,sans-serif; --f-mono:"IBM Plex Mono",ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1713; --surface:#18221c; --ink:#e6eee8; --muted:#93a59a; --line:#2b3a31;
+  --accent:#4cc088; --accent-ink:#06150d; --bunk:#f0a91a; --alley:#6aa4ee; --bad:#f06a5d;
+  --map:#121c16; --grid:#1f2d25; --halo:#0f1713;
+  --r1:#4cc088; --r2:#6aa4ee; --r3:#c88ad8; --r4:#e8a14a; --r5:#4cc4cf; --r6:#e8809a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1713; --surface:#18221c; --ink:#e6eee8; --muted:#93a59a; --line:#2b3a31;
+  --accent:#4cc088; --accent-ink:#06150d; --bunk:#f0a91a; --alley:#6aa4ee; --bad:#f06a5d;
+  --map:#121c16; --grid:#1f2d25; --halo:#0f1713;
+  --r1:#4cc088; --r2:#6aa4ee; --r3:#c88ad8; --r4:#e8a14a; --r5:#4cc4cf; --r6:#e8809a; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;overflow:hidden;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0}
+#app{height:100%;display:flex;flex-direction:column;gap:8px;padding-block:8px}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+h1{font:700 22px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase;margin:0}
+.fix{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none}
+.dot.good{background:var(--accent)} .dot.ok{background:var(--bunk)} .dot.bad{background:var(--bad)}
+#fixTxt{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:13px;font-weight:600;cursor:pointer;min-height:36px}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
+#mapwrap{position:relative;flex:1 1 0;min-height:140px;border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--map)}
+canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;display:block}
+.fab{position:absolute;right:8px;display:flex;flex-direction:column;gap:6px}
+.fab button{width:44px;height:44px;border-radius:6px;border:1px solid var(--line);background:var(--surface);font:700 12px var(--f-body);cursor:pointer}
+.fab button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+#legend{position:absolute;left:8px;top:8px;font-size:11px;background:color-mix(in srgb,var(--surface) 88%,transparent);border:1px solid var(--line);border-radius:4px;padding:4px 8px;line-height:1.5}
+#legend i{display:inline-block;width:18px;height:0;border-top:4px solid var(--bunk);vertical-align:middle;margin-right:6px}
+#legend b{display:inline-block;width:14px;height:10px;background:var(--r1);opacity:.4;border:1px solid var(--r1);vertical-align:middle;margin-right:6px}
+
+#sheet{flex:0 0 auto;max-height:46%;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:6px;min-height:0}
+[role=tablist]{display:flex;border-bottom:1px solid var(--line)}
+[role=tab]{flex:1;border:0;background:none;padding:12px 4px;font:600 13px var(--f-body);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);cursor:pointer;border-bottom:3px solid transparent;min-height:44px}
+[role=tab][aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.panel{padding:12px;overflow:auto;display:flex;flex-direction:column;gap:12px;min-height:0}
+.row{display:flex;gap:8px;align-items:end;flex-wrap:wrap}
+.field{display:flex;flex-direction:column;gap:4px;flex:1;min-width:84px}
+.field label,.lbl{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+input[type=text],input[type=number],select,textarea{background:var(--bg);border:1px solid var(--line);border-radius:5px;padding:10px;min-height:44px;width:100%}
+textarea{font-family:var(--f-mono);font-size:11px;min-height:110px;resize:vertical}
+.btn{min-height:48px;padding:0 16px;border-radius:6px;border:1px solid var(--line);background:var(--bg);font-weight:600;cursor:pointer}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font:700 20px var(--f-display);letter-spacing:.05em;text-transform:uppercase}
+.btn.big{flex:1;min-height:60px}
+.btn.warn{color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5}
+.note{font-size:12px;color:var(--muted);line-height:1.45;margin:0}
+.check{display:flex;gap:8px;align-items:center;font-size:14px}
+.check input{width:20px;height:20px}
+#prog{height:6px;background:var(--line);border-radius:3px;overflow:hidden}
+#prog i{display:block;height:100%;width:0;background:var(--accent)}
+.sum{font:500 12px var(--f-mono);color:var(--muted)}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+li.pen{display:grid;grid-template-columns:10px 1fr auto auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}
+li.pen[aria-current="true"]{background:color-mix(in srgb,var(--accent) 12%,transparent)}
+li.pen .sw{width:10px;height:28px;border-radius:2px}
+li.pen .nm{font:700 17px var(--f-display);letter-spacing:.03em}
+li.pen .mt{font:400 11px var(--f-mono);color:var(--muted)}
+li.pen button{border:1px solid var(--line);background:var(--bg);border-radius:5px;min-height:36px;min-width:36px;cursor:pointer}
+#toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 12px);background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:6px;font-size:13px;max-width:90%;z-index:20}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+</style>
+
+<div id="app">
+  <header>
+    <h1>Pen Walker</h1>
+    <div class="fix"><span class="dot" id="dot"></span><span id="fixTxt" class="mono">Waiting for GPS</span></div>
+    <button class="chip" id="simBtn" aria-pressed="false">Simulate GPS</button>
+  </header>
+
+  <div id="mapwrap">
+    <canvas id="cv" aria-label="Pen map"></canvas>
+    <div id="legend"><i></i>Feed bunk<br><b></b>Pen perimeter</div>
+    <div class="fab">
+      <button id="fitBtn" title="Fit all">Fit</button>
+      <button id="followBtn" aria-pressed="false" title="Follow me">Me</button>
+    </div>
+  </div>
+
+  <section id="sheet">
+    <div role="tablist" aria-label="Controls">
+      <button role="tab" id="t-cap" aria-selected="true" aria-controls="p-cap">Capture</button>
+      <button role="tab" id="t-pens" aria-selected="false" aria-controls="p-pens">Pens</button>
+      <button role="tab" id="t-file" aria-selected="false" aria-controls="p-file">Map file</button>
+    </div>
+
+    <div class="panel" id="p-cap" role="tabpanel" aria-labelledby="t-cap">
+      <div class="row">
+        <div class="field"><label for="penId">Pen ID</label><input type="text" id="penId" autocomplete="off" autocapitalize="characters"></div>
+        <div class="field"><label for="avg">Average fix for</label>
+          <select id="avg"><option value="2">2 s</option><option value="5" selected>5 s</option><option value="10">10 s</option><option value="20">20 s</option></select></div>
+      </div>
+      <div class="row">
+        <button class="btn primary big" id="markBtn">Start pen</button>
+        <button class="btn" id="cancelBtn" hidden>Cancel</button>
+      </div>
+      <div id="prog" hidden><i></i></div>
+      <label class="check"><input type="checkbox" id="chain" checked> Chain: next pen starts where this one ends</label>
+      <p class="note" id="capNote">Stand at the start of the feed bunk and tap Start pen. Walk along the bunk and tap End pen at the far end. Pens that touch within the link distance join into one side of an alley.</p>
+    </div>
+
+    <div class="panel" id="p-pens" role="tabpanel" aria-labelledby="t-pens" hidden>
+      <div class="sum" id="sum"></div>
+      <div class="grid2">
+        <div class="field"><label for="sTol">Link distance (m)</label><input type="number" id="sTol" step="0.5" min="0.5"></div>
+        <div class="field"><label for="sAlley">Max alley width (m)</label><input type="number" id="sAlley" step="1" min="5"></div>
+        <div class="field"><label for="sDepth">Default pen depth (m)</label><input type="number" id="sDepth" step="1" min="5"></div>
+        <div class="field"><label for="sSide">Unpaired pens extend</label><select id="sSide"><option value="right">Right of travel</option><option value="left">Left of travel</option></select></div>
+      </div>
+      <p class="note">Rows facing each other across an alley are detected automatically. Pens extend away from the alley, to half the distance to the next row behind them, or the default depth if none is found.</p>
+      <ul id="penList"></ul>
+    </div>
+
+    <div class="panel" id="p-file" role="tabpanel" aria-labelledby="t-file" hidden>
+      <div class="row">
+        <button class="btn" id="expMap">Save map file</button>
+        <button class="btn" id="expGeo">Save GeoJSON</button>
+        <button class="btn" id="copyMap">Copy text</button>
+      </div>
+      <div class="field"><label for="mapText">Map file text (ORIGIN and PEN records)</label><textarea id="mapText" spellcheck="false"></textarea></div>
+      <div class="row">
+        <button class="btn" id="loadText">Load from text</button>
+        <label class="btn" style="display:inline-flex;align-items:center">Open file<input type="file" id="fileIn" accept=".map,.txt,.csv,text/plain" hidden></label>
+        <button class="btn" id="example">Load example</button>
+        <button class="btn warn" id="clearAll">Clear all</button>
+      </div>
+      <p class="note">Format: <span class="mono">ORIGIN,lat,lon,alt</span> and <span class="mono">PEN,id,beginLat,beginLon,beginAlt,endLat,endLon,endAlt</span>. Latitude and longitude take N, S, E or W suffixes. Lines starting with / are comments.</p>
+    </div>
+  </section>
+</div>
+<div id="toast" hidden></div>
+
+<script>
+(function(){
+"use strict";
+const $=s=>document.querySelector(s);
+const R=6371008.8, D2R=Math.PI/180, MPD=R*D2R, LS="penwalker.v1";
+const SIM_ORIGIN={lat:40.0,lon:-101.0,alt:900};
+let state={origin:null,pens:[],nextId:"1",settings:{tol:2,alley:40,depth:60,side:"right"}};
+let D={L:[],rows:[],alleys:0};
+let fix=null, sim=false, simLoc={x:0,y:0}, watchId=null, pending=null, collecting=null, sel=-1, follow=false;
+const view={cx:0,cy:0,s:2};
+const cv=$("#cv"), ctx=cv.getContext("2d");
+let W=0,H=0,dpr=1;
+
+/* ---------- storage ---------- */
+function save(){try{localStorage.setItem(LS,JSON.stringify(state));}catch(e){}}
+function restore(){try{const t=localStorage.getItem(LS);if(t){const o=JSON.parse(t);if(o&&Array.isArray(o.pens)){state=Object.assign(state,o);state.settings=Object.assign({tol:2,alley:40,depth:60,side:"right"},o.settings||{});}}}catch(e){}}
+
+/* ---------- geometry ---------- */
+const O=()=>state.origin||SIM_ORIGIN;
+function loc(p){const o=O();return{x:(p.lon-o.lon)*MPD*Math.cos(o.lat*D2R),y:(p.lat-o.lat)*MPD};}
+function geo(x,y){const o=O();return{lat:o.lat+y/MPD,lon:o.lon+x/(MPD*Math.cos(o.lat*D2R))};}
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+
+/* ---------- build: link pens into rows, pair rows into alleys, derive perimeters ---------- */
+function build(){
+  const S=state.settings;
+  const L=state.pens.map((p,i)=>({p,i,b:loc(p.b),e:loc(p.e),prev:null,next:null,row:-1,d:null}));
+  for(const a of L){let best=null,bd=S.tol;for(const c of L){if(c===a||c.prev)continue;const d=dist(a.e,c.b);if(d<bd){bd=d;best=c;}}if(best){a.next=best;best.prev=a;}}
+  const rows=[],seen=new Set();
+  const walk=s=>{const r={pens:[],side:null};let c=s;while(c&&!seen.has(c)){seen.add(c);c.row=rows.length;r.pens.push(c);c=c.next;}rows.push(r);};
+  L.filter(q=>!q.prev).forEach(walk);L.forEach(q=>{if(!seen.has(q))walk(q);});
+  function ray(P,d,skip,maxT){let best={t:Infinity,row:-1};for(const q of L){if(q.row===skip)continue;const sx=q.e.x-q.b.x,sy=q.e.y-q.b.y;const den=d.x*sy-d.y*sx;if(Math.abs(den)<1e-9)continue;const qx=q.b.x-P.x,qy=q.b.y-P.y;const t=(qx*sy-qy*sx)/den,u=(qx*d.y-qy*d.x)/den;if(t>0.01&&t<=maxT&&u>=0&&u<=1&&t<best.t)best={t,row:q.row};}return best;}
+  const pairs=new Set();
+  for(const r of rows){
+    let vote=0;
+    for(const q of r.pens){
+      const len=dist(q.b,q.e);if(len<0.5){q.bad=true;continue;}
+      q.dir={x:(q.e.x-q.b.x)/len,y:(q.e.y-q.b.y)/len};q.len=len;
+      q.ln={x:-q.dir.y,y:q.dir.x};
+      const mid={x:(q.b.x+q.e.x)/2,y:(q.b.y+q.e.y)/2};
+      const hl=ray(mid,q.ln,q.row,S.alley),hr=ray(mid,{x:-q.ln.x,y:-q.ln.y},q.row,S.alley);
+      if(hl.t<Infinity||hr.t<Infinity){const left=hl.t<hr.t;vote+=left?1:-1;pairs.add([q.row,(left?hl:hr).row].sort((a,b)=>a-b).join("-"));}
+    }
+    const alleySide=vote>0?"left":vote<0?"right":(S.side==="right"?"left":"right");
+    r.side=alleySide==="left"?"right":"left"; // side pens extend toward
+    r.found=vote!==0;
+    const raws=[];
+    for(const q of r.pens){
+      if(q.bad)continue;
+      const sg=r.side==="left"?1:-1;
+      q.pn={x:q.ln.x*sg,y:q.ln.y*sg};
+      const hb=ray(q.b,q.pn,q.row,2.5*S.depth).t,he=ray(q.e,q.pn,q.row,2.5*S.depth).t;
+      q.rb=hb<Infinity?hb/2:null;q.re=he<Infinity?he/2:null;
+      if(q.rb!=null)raws.push(q.rb);if(q.re!=null)raws.push(q.re);
+    }
+    raws.sort((a,b)=>a-b);
+    const med=raws.length?raws[Math.floor(raws.length/2)]:S.depth;
+    for(const q of r.pens){
+      if(q.bad)continue;
+      const dB=q.rb??med,dE=q.re??med;
+      q.d={dB,dE,poly:[q.b,q.e,{x:q.e.x+q.pn.x*dE,y:q.e.y+q.pn.y*dE},{x:q.b.x+q.pn.x*dB,y:q.b.y+q.pn.y*dB}]};
+    }
+  }
+  D={L,rows,alleys:pairs.size};
+}
+
+/* ---------- map file ---------- */
+const fmtLat=v=>Math.abs(v).toFixed(7)+(v<0?"S":"N");
+const fmtLon=v=>Math.abs(v).toFixed(7)+(v<0?"W":"E");
+const fmtAlt=v=>(v==null?0.1:v).toFixed(2);
+function toText(){
+  const out=["/ Pen Walker map file","/ ORIGIN,lat,lon,alt","/ PEN,id,beginLat,beginLon,beginAlt,endLat,endLon,endAlt"];
+  if(state.origin)out.push(["ORIGIN",fmtLat(state.origin.lat),fmtLon(state.origin.lon),fmtAlt(state.origin.alt)].join(","));
+  for(const p of state.pens)out.push(["PEN",p.id,fmtLat(p.b.lat),fmtLon(p.b.lon),fmtAlt(p.b.alt),fmtLat(p.e.lat),fmtLon(p.e.lon),fmtAlt(p.e.alt)].join(","));
+  return out.join("\n")+"\n";
+}
+function val(f){const s=String(f).trim();const m=s.match(/[NSEWnsew]$/);let v=parseFloat(s);if(isNaN(v))return NaN;if(m&&/[SsWw]/.test(m[0]))v=-Math.abs(v);return v;}
+function parseText(t){
+  const res={origin:null,pens:[],bad:0};
+  for(let line of t.split(/\r?\n/)){
+    line=line.trim();if(!line||line[0]==="/")continue;
+    const f=line.split(",").map(x=>x.trim());const k=f[0].toUpperCase();
+    if(k==="ORIGIN"){const a=val(f[1]),b=val(f[2]),c=parseFloat(f[3]);if(a&&b&&c&&!res.origin)res.origin={lat:a,lon:b,alt:c};else if(!(a&&b&&c))res.bad++;}
+    else if(k==="PEN"){const v=[val(f[2]),val(f[3]),parseFloat(f[4]),val(f[5]),val(f[6]),parseFloat(f[7])];
+      if(f[1]&&v.every(x=>x&&!isNaN(x)))res.pens.push({id:f[1],b:{lat:v[0],lon:v[1],alt:v[2]},e:{lat:v[3],lon:v[4],alt:v[5]}});else res.bad++;}
+  }
+  return res;
+}
+function applyParsed(r){state.example=false;
+  if(!r.pens.length&&!r.origin){toast("No ORIGIN or PEN records found");return false;}
+  state.origin=r.origin||(r.pens[0]?{lat:r.pens[0].b.lat,lon:r.pens[0].b.lon,alt:r.pens[0].b.alt}:null);
+  state.pens=r.pens;state.nextId=nextId(r.pens.length?r.pens[r.pens.length-1].id:"0");
+  pending=null;sel=-1;refresh();fitAll();
+  toast("Loaded "+r.pens.length+" pens"+(r.bad?" · "+r.bad+" bad lines skipped":""));return true;
+}
+function geojson(){
+  const feats=[];
+  for(const q of D.L){
+    feats.push({type:"Feature",properties:{id:q.p.id,kind:"bunk",row:q.row+1},geometry:{type:"LineString",coordinates:[[q.p.b.lon,q.p.b.lat],[q.p.e.lon,q.p.e.lat]]}});
+    if(q.d){const ring=q.d.poly.map(pt=>{const g=geo(pt.x,pt.y);return[g.lon,g.lat];});ring.push(ring[0]);
+      feats.push({type:"Feature",properties:{id:q.p.id,kind:"perimeter",row:q.row+1,depthBegin:+q.d.dB.toFixed(1),depthEnd:+q.d.dE.toFixed(1)},geometry:{type:"Polygon",coordinates:[ring]}});}
+  }
+  return JSON.stringify({type:"FeatureCollection",features:feats},null,1);
+}
+
+/* ---------- helpers: files, toast ---------- */
+let tt=null;
+function toast(m){const t=$("#toast");t.textContent=m;t.hidden=false;clearTimeout(tt);tt=setTimeout(()=>t.hidden=true,2800);}
+async function saveFile(name,text,mime){
+  try{if(window.AndroidBridge&&AndroidBridge.saveFile){const r=AndroidBridge.saveFile(name,text,mime);toast(r||"Saved");return;}}catch(e){}
+  try{const dl=window.claude&&await window.claude.use("downloads");if(dl){await dl.save({filename:name,data:text});return;}}catch(e){if(e&&e.code!==undefined&&String(e.code).includes("declin"))return;}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:mime}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast("Saving "+name);}
+  catch(e){toast("Save blocked here. Use Copy text instead.");}
+}
+async function copy(text){try{await navigator.clipboard.writeText(text);toast("Copied");}catch(e){const t=$("#mapText");t.focus();t.select();toast("Select and copy the text");}}
+
+/* ---------- GPS ---------- */
+function curPos(){
+  if(sim){const g=geo(simLoc.x,simLoc.y);return{lat:g.lat,lon:g.lon,alt:O().alt,acc:1};}
+  return fix;
+}
+function startGPS(){
+  if(!("geolocation" in navigator)){setFix("bad","GPS not available. Use Simulate GPS.");return;}
+  try{
+    watchId=navigator.geolocation.watchPosition(p=>{
+      fix={lat:p.coords.latitude,lon:p.coords.longitude,alt:p.coords.altitude,acc:p.coords.accuracy,t:p.timestamp};
+      if(!state.origin&&!sim){state.origin={lat:fix.lat,lon:fix.lon,alt:fix.alt??0.1};save();build();}
+      onPos();
+    },e=>{
+      const msg=e.code===1?"Location blocked. Allow it, or open the saved file on your phone. Simulate GPS works anywhere.":"No GPS fix ("+e.message+")";
+      setFix("bad",msg);
+    },{enableHighAccuracy:true,maximumAge:0,timeout:20000});
+  }catch(e){setFix("bad","GPS unavailable");}
+  try{navigator.wakeLock&&navigator.wakeLock.request("screen").catch(()=>{});}catch(e){}
+}
+function setFix(cls,txt){$("#dot").className="dot "+cls;$("#fixTxt").textContent=txt;}
+function onPos(){
+  const p=curPos();if(!p){return;}
+  const cls=p.acc<=5?"good":p.acc<=15?"ok":"bad";
+  setFix(cls,(sim?"SIM ":"±"+p.acc.toFixed(1)+" m  ")+p.lat.toFixed(6)+", "+p.lon.toFixed(6)+(p.alt!=null?"  "+p.alt.toFixed(0)+" m":""));
+  if(follow){const l=loc(p);view.cx=l.x;view.cy=l.y;}
+  draw();
+}
+
+/* ---------- capture ---------- */
+function nextId(id){const m=String(id).match(/^(.*?)(\d+)$/);if(!m)return id+"1";const n=String(+m[2]+1);return m[1]+n.padStart(m[2].length,"0");}
+function uiCapture(){
+  const b=$("#markBtn");
+  b.textContent=collecting?"Averaging…":pending?"End pen "+pending.id:"Start pen";
+  b.disabled=!!collecting;
+  $("#cancelBtn").hidden=!pending||!!collecting;
+  $("#penId").value=pending?pending.id:$("#penId").value;
+  $("#penId").disabled=!!pending;
+}
+function mark(){
+  const p=curPos();if(!p){toast("No position yet");return;}
+  if(state.example){state.example=false;if(!sim){state.pens=[];state.origin=null;refresh();}}
+  if(!state.origin)state.origin={lat:p.lat,lon:p.lon,alt:p.alt??0.1};
+  const id=pending?pending.id:($("#penId").value.trim()||state.nextId);
+  const n=Math.max(1,+$("#avg").value);
+  collecting={id,kind:pending?"end":"begin",s:[],until:Date.now()+n*1000,total:n*1000};
+  $("#prog").hidden=false;uiCapture();
+  const iv=setInterval(()=>{
+    const c=curPos();if(c)collecting.s.push(c);
+    const left=collecting.until-Date.now();
+    $("#prog i").style.width=Math.min(100,100*(1-left/collecting.total))+"%";
+    if(left<=0){clearInterval(iv);finishMark();}
+  },200);
+}
+function finishMark(){
+  const s=collecting.s;const m=k=>s.reduce((a,x)=>a+(x[k]||0),0)/s.length;
+  const pt={lat:m("lat"),lon:m("lon"),alt:s.some(x=>x.alt!=null)?m("alt"):0.1};
+  const c=collecting;collecting=null;$("#prog").hidden=true;
+  if(c.kind==="begin"){pending={id:c.id,b:pt};toast("Start of "+c.id+" marked ("+s.length+" fixes)");}
+  else{
+    state.pens.push({id:c.id,b:pending.b,e:pt});
+    const nid=nextId(c.id);state.nextId=nid;
+    if($("#chain").checked){pending={id:nid,b:pt};}else{pending=null;$("#penId").value=nid;}
+    toast("Pen "+c.id+" saved ("+dist(loc(state.pens[state.pens.length-1].b),loc(pt)).toFixed(1)+" m)");
+    refresh();
+  }
+  uiCapture();draw();save();
+}
+
+/* ---------- UI lists ---------- */
+function refresh(){build();save();renderPens();$("#mapText").value=toText();draw();}
+function renderPens(){
+  const n=D.L.length;
+  $("#sum").textContent=n+" pens · "+D.rows.length+" rows · "+D.alleys+" alleys";
+  const ul=$("#penList");ul.innerHTML="";
+  if(!n){const li=document.createElement("li");li.className="note";li.textContent="No pens yet. Capture a pen, or load the example from the Map file tab.";ul.appendChild(li);return;}
+  D.L.forEach((q,i)=>{
+    const li=document.createElement("li");li.className="pen";if(i===sel)li.setAttribute("aria-current","true");
+    const sw=document.createElement("span");sw.className="sw";sw.style.background="var(--r"+(q.row%6+1)+")";
+    const mid=document.createElement("div");
+    const nm=document.createElement("div");nm.className="nm";nm.textContent="Pen "+q.p.id;
+    const mt=document.createElement("div");mt.className="mt";
+    mt.textContent="row "+(q.row+1)+" · bunk "+(q.len??dist(q.b,q.e)).toFixed(1)+" m"+(q.d?" · depth "+((q.d.dB+q.d.dE)/2).toFixed(0)+" m":"");
+    mid.append(nm,mt);
+    const z=document.createElement("button");z.textContent="Go";z.setAttribute("aria-label","Show pen "+q.p.id);
+    const x=document.createElement("button");x.textContent="✕";x.setAttribute("aria-label","Delete pen "+q.p.id);
+    li.append(sw,mid,z,x);
+    li.addEventListener("click",()=>{sel=i;zoomTo(q);renderPens();draw();});
+    x.addEventListener("click",e=>{e.stopPropagation();state.pens.splice(i,1);sel=-1;refresh();});
+    ul.appendChild(li);
+  });
+}
+function zoomTo(q){const pts=q.d?q.d.poly:[q.b,q.e];fitPts(pts);}
+
+/* ---------- map ---------- */
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const w2s=(x,y)=>[(x-view.cx)*view.s+W/2,H/2-(y-view.cy)*view.s];
+const s2w=(px,py)=>({x:(px-W/2)/view.s+view.cx,y:(H/2-py)/view.s+view.cy});
+function resize(){const r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);draw();}
+function fitPts(pts){
+  if(!pts.length)return;let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const p of pts){x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);}
+  const w=Math.max(x1-x0,30),h=Math.max(y1-y0,30);
+  view.cx=(x0+x1)/2;view.cy=(y0+y1)/2;view.s=Math.min(60,Math.max(.05,Math.min(W/(w*1.2),H/(h*1.2))||1));draw();
+}
+function fitAll(){
+  const pts=[];for(const q of D.L){pts.push(q.b,q.e);if(q.d)pts.push(...q.d.poly);}
+  const p=curPos();if(p&&!pts.length)pts.push(loc(p));
+  if(!pts.length)pts.push({x:-30,y:-30},{x:30,y:30});
+  fitPts(pts);
+}
+function draw(){
+  if(!W||!H||!(view.s>0))return;
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+  ctx.fillStyle=css("--map");ctx.fillRect(0,0,W,H);
+  // grid
+  const steps=[1,2,5,10,20,50,100,200,500,1000];let step=steps.find(s=>s*view.s>=60)||1000;
+  const a=s2w(0,H),b=s2w(W,0);ctx.lineWidth=1;ctx.strokeStyle=css("--grid");ctx.beginPath();
+  for(let x=Math.ceil(a.x/step)*step;x<=b.x;x+=step){const[px]=w2s(x,0);ctx.moveTo(Math.round(px)+.5,0);ctx.lineTo(Math.round(px)+.5,H);}
+  for(let y=Math.ceil(a.y/step)*step;y<=b.y;y+=step){const[,py]=w2s(0,y);ctx.moveTo(0,Math.round(py)+.5);ctx.lineTo(W,Math.round(py)+.5);}
+  ctx.stroke();
+  const ink=css("--ink"),halo=css("--halo"),bunk=css("--bunk");
+  // perimeters
+  for(const q of D.L){
+    if(!q.d)continue;const col=css("--r"+(q.row%6+1));
+    ctx.beginPath();q.d.poly.forEach((p,i)=>{const[px,py]=w2s(p.x,p.y);i?ctx.lineTo(px,py):ctx.moveTo(px,py);});ctx.closePath();
+    ctx.globalAlpha=D.L.indexOf(q)===sel?.45:.2;ctx.fillStyle=col;ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=col;ctx.lineWidth=D.L.indexOf(q)===sel?3:1.5;ctx.stroke();
+  }
+  // bunks
+  ctx.lineCap="round";
+  for(const q of D.L){
+    const[x0,y0]=w2s(q.b.x,q.b.y),[x1,y1]=w2s(q.e.x,q.e.y);
+    ctx.strokeStyle=bunk;ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    const ang=Math.atan2(y1-y0,x1-x0);ctx.fillStyle=ink;ctx.beginPath();ctx.moveTo(x1,y1);
+    ctx.lineTo(x1-9*Math.cos(ang-.45),y1-9*Math.sin(ang-.45));ctx.lineTo(x1-9*Math.cos(ang+.45),y1-9*Math.sin(ang+.45));ctx.closePath();ctx.fill();
+    if(Math.hypot(x1-x0,y1-y0)>26){
+      const mx=(x0+x1)/2,my=(y0+y1)/2;let nx=0,ny=0;if(q.pn){nx=q.pn.x;ny=-q.pn.y;}
+      const lx=mx+nx*14,ly=my+ny*14;ctx.font="700 13px "+getComputedStyle(document.body).fontFamily;ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.lineWidth=3;ctx.strokeStyle=halo;ctx.strokeText(q.p.id,lx,ly);ctx.fillStyle=ink;ctx.fillText(q.p.id,lx,ly);
+    }
+  }
+  // pending
+  const p=curPos();
+  if(pending){
+    const l=loc(pending.b),[px,py]=w2s(l.x,l.y);
+    ctx.fillStyle=bunk;ctx.beginPath();ctx.arc(px,py,7,0,6.3);ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=2;ctx.stroke();
+    if(p){const c=loc(p),[cx,cy]=w2s(c.x,c.y);ctx.setLineDash([6,5]);ctx.strokeStyle=bunk;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(px,py);ctx.lineTo(cx,cy);ctx.stroke();ctx.setLineDash([]);}
+  }
+  // me
+  if(p){
+    const l=loc(p),[px,py]=w2s(l.x,l.y),ar=Math.max(6,(p.acc||0)*view.s);
+    ctx.fillStyle=css("--alley");ctx.globalAlpha=.15;ctx.beginPath();ctx.arc(px,py,ar,0,6.3);ctx.fill();ctx.globalAlpha=1;
+    ctx.fillStyle=css("--alley");ctx.beginPath();ctx.arc(px,py,8,0,6.3);ctx.fill();ctx.strokeStyle="#fff";ctx.lineWidth=3;ctx.stroke();
+  }
+  // scale bar
+  const bm=steps.find(s=>s*view.s>=70)||1000,bl=bm*view.s,bx=12,by=H-14;
+  ctx.strokeStyle=ink;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(bx,by-5);ctx.lineTo(bx,by);ctx.lineTo(bx+bl,by);ctx.lineTo(bx+bl,by-5);ctx.stroke();
+  ctx.font="500 11px "+getComputedStyle(document.body).fontFamily;ctx.textAlign="left";ctx.textBaseline="bottom";ctx.fillStyle=ink;ctx.lineWidth=3;ctx.strokeStyle=halo;
+  ctx.strokeText(bm+" m",bx+4,by-7);ctx.fillText(bm+" m",bx+4,by-7);
+  if(sim){ctx.textAlign="right";ctx.strokeText("Tap map to move",W-62,H-8);ctx.fillText("Tap map to move",W-62,H-8);}
+}
+
+/* pointer: pan, pinch, tap */
+const ptrs=new Map();let tap=null,pinch=null;
+cv.addEventListener("pointerdown",e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,{x:e.offsetX,y:e.offsetY});tap=ptrs.size===1?{x:e.offsetX,y:e.offsetY,t:Date.now(),moved:false}:null;if(ptrs.size===2)pinch=null;});
+cv.addEventListener("pointermove",e=>{
+  const p=ptrs.get(e.pointerId);if(!p)return;
+  if(ptrs.size===1){const dx=e.offsetX-p.x,dy=e.offsetY-p.y;view.cx-=dx/view.s;view.cy+=dy/view.s;follow=false;$("#followBtn").setAttribute("aria-pressed","false");if(tap&&Math.hypot(e.offsetX-tap.x,e.offsetY-tap.y)>6)tap.moved=true;}
+  p.x=e.offsetX;p.y=e.offsetY;
+  if(ptrs.size===2){
+    const[a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y),m={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+    if(pinch){const w=s2w(m.x,m.y);view.s=Math.min(60,Math.max(.05,view.s*d/pinch.d));const w2=s2w(m.x,m.y);view.cx+=w.x-w2.x;view.cy+=w.y-w2.y;}
+    pinch={d};
+  }
+  draw();
+});
+function up(e){
+  ptrs.delete(e.pointerId);pinch=null;
+  if(tap&&!tap.moved&&Date.now()-tap.t<450&&ptrs.size===0)onTap(tap.x,tap.y);
+  tap=null;
+}
+cv.addEventListener("pointerup",up);cv.addEventListener("pointercancel",e=>{ptrs.delete(e.pointerId);tap=null;});
+cv.addEventListener("wheel",e=>{e.preventDefault();const w=s2w(e.offsetX,e.offsetY);view.s=Math.min(60,Math.max(.05,view.s*(e.deltaY<0?1.15:1/1.15)));const w2=s2w(e.offsetX,e.offsetY);view.cx+=w.x-w2.x;view.cy+=w.y-w2.y;draw();},{passive:false});
+function onTap(px,py){
+  if(sim){const w=s2w(px,py);simLoc={x:w.x,y:w.y};onPos();return;}
+  let best=-1,bd=24;
+  D.L.forEach((q,i)=>{const[x0,y0]=w2s(q.b.x,q.b.y),[x1,y1]=w2s(q.e.x,q.e.y);const dx=x1-x0,dy=y1-y0,l2=dx*dx+dy*dy||1;let t=((px-x0)*dx+(py-y0)*dy)/l2;t=Math.max(0,Math.min(1,t));const d=Math.hypot(px-(x0+t*dx),py-(y0+t*dy));if(d<bd){bd=d;best=i;}});
+  sel=best;renderPens();draw();
+  if(best>=0)toast("Pen "+D.L[best].p.id+" · row "+(D.L[best].row+1));
+}
+
+/* ---------- example data ---------- */
+function loadExample(){
+  const o=SIM_ORIGIN,pens=[];
+  const G=(x,y)=>{const lat=o.lat+y/MPD,lon=o.lon+x/(MPD*Math.cos(o.lat*D2R));return{lat,lon,alt:o.alt};};
+  const rows=[{y:0,dir:1,pre:"A"},{y:-25,dir:-1,pre:"B"},{y:-145,dir:1,pre:"C"},{y:-170,dir:-1,pre:"D"}];
+  for(const r of rows){for(let k=0;k<6;k++){const x0=r.dir>0?k*32:(6-k)*32,x1=r.dir>0?(k+1)*32-1.2:(5-k)*32+1.2;
+    // consecutive pens share an endpoint within link distance
+    const bx=r.dir>0?k*32:(6-k)*32,ex=r.dir>0?(k+1)*32:(5-k)*32;
+    pens.push({id:r.pre+(k+1),b:G(bx,r.y),e:G(ex,r.y)});}}
+  state.origin={lat:o.lat,lon:o.lon,alt:o.alt};state.example=true;state.pens=pens;state.nextId="1";pending=null;sel=-1;
+  refresh();fitAll();toast("Example feedlot loaded: 24 pens, 4 rows, 2 alleys");
+}
+
+/* ---------- wiring ---------- */
+function tab(id){
+  ["cap","pens","file"].forEach(k=>{const on=k===id;$("#t-"+k).setAttribute("aria-selected",on);$("#p-"+k).hidden=!on;});
+  setTimeout(resize,0);
+}
+["cap","pens","file"].forEach(k=>$("#t-"+k).addEventListener("click",()=>tab(k)));
+$("#markBtn").addEventListener("click",mark);
+$("#cancelBtn").addEventListener("click",()=>{pending=null;uiCapture();draw();});
+$("#simBtn").addEventListener("click",()=>{
+  sim=!sim;$("#simBtn").setAttribute("aria-pressed",sim);
+  if(sim){if(!state.origin){state.origin={...SIM_ORIGIN};save();build();}
+    const p=fix&&!sim?loc(fix):{x:0,y:0};simLoc=D.L.length?{x:D.L[0].b.x,y:D.L[0].b.y}:p;if(follow){}
+    toast("Simulation on. Tap the map to move your position.");}
+  onPos();if(!sim&&!fix)setFix("","Waiting for GPS");
+});
+$("#fitBtn").addEventListener("click",fitAll);
+$("#followBtn").addEventListener("click",()=>{follow=!follow;$("#followBtn").setAttribute("aria-pressed",follow);const p=curPos();if(follow&&p){const l=loc(p);view.cx=l.x;view.cy=l.y;if(view.s<2)view.s=3;draw();}});
+for(const [id,k] of [["sTol","tol"],["sAlley","alley"],["sDepth","depth"],["sSide","side"]]){
+  const el=$("#"+id);el.value=state.settings[k];
+  el.addEventListener("change",()=>{state.settings[k]=k==="side"?el.value:Math.max(.5,+el.value||state.settings[k]);refresh();});
+}
+$("#expMap").addEventListener("click",()=>saveFile("pens.map",toText(),"text/plain"));
+$("#expGeo").addEventListener("click",()=>saveFile("pens.geojson",geojson(),"application/geo+json"));
+$("#copyMap").addEventListener("click",()=>copy(toText()));
+$("#loadText").addEventListener("click",()=>applyParsed(parseText($("#mapText").value)));
+$("#fileIn").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>applyParsed(parseText(String(r.result)));r.readAsText(f);e.target.value="";});
+$("#example").addEventListener("click",loadExample);
+let clr=false;
+$("#clearAll").addEventListener("click",e=>{
+  if(!clr){clr=true;e.target.textContent="Tap again to clear";setTimeout(()=>{clr=false;e.target.textContent="Clear all";},3000);return;}
+  clr=false;e.target.textContent="Clear all";state.pens=[];state.origin=fix?{lat:fix.lat,lon:fix.lon,alt:fix.alt??0.1}:null;state.nextId="1";pending=null;sel=-1;
+  $("#penId").value="1";uiCapture();refresh();toast("Cleared");
+});
+$("#penId").addEventListener("change",()=>{state.nextId=$("#penId").value.trim()||state.nextId;save();});
+window.addEventListener("resize",resize);
+if(window.ResizeObserver)new ResizeObserver(resize).observe($("#mapwrap"));
+
+/* ---------- start ---------- */
+restore();
+$("#penId").value=state.nextId;
+if(!state.pens.length&&!state.origin){/* first run: show the example so the map is never empty */loadExample();}
+else{refresh();}
+uiCapture();resize();fitAll();startGPS();
+})();
+</script>
+<script>if("serviceWorker" in navigator&&location.protocol==="https:"&&!window.AndroidBridge){navigator.serviceWorker.register("sw.js").catch(function(){});}</script></body></html>
